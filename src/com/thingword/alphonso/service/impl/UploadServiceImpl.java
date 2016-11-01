@@ -7,32 +7,52 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.regex.Matcher;
+import java.util.Map;
 import java.util.regex.Pattern;
-
-import org.apache.poi.hssf.usermodel.HSSFCell;
-import org.apache.poi.hssf.usermodel.HSSFRow;
-import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.glassfish.jersey.message.MessageBodyWorkers;
+import org.hibernate.loader.plan.exec.process.spi.ReturnReader;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.interceptor.CacheableOperation;
 
-import com.microsoft.schemas.office.visio.x2012.main.ShapeSheetType;
-import com.mysql.jdbc.StreamingNotifiable;
 import com.thingword.alphonso.bean.MESSAGE;
 import com.thingword.alphonso.bean.ReturnMessage;
+import com.thingword.alphonso.bean.db.Configure;
 import com.thingword.alphonso.bean.db.Product;
+import com.thingword.alphonso.dao.ConfigureDao;
+import com.thingword.alphonso.dao.impl.ConfigureDaoImpl;
 import com.thingword.alphonso.dao.impl.ProductDaoImpl;
 import com.thingword.alphonso.service.UploadService;
 import com.thingword.alphonso.util.FileUtil;
 import com.thingword.alphonso.util.ZipUtil;
 
 public class UploadServiceImpl implements UploadService {
+	
+	public static String[] keyList = new String[]{"插件","电装","ICT","外观","检测","包装"};
+
+	public static final HashSet<String> keyWords = new HashSet<String>() {
+		{
+			add(keyList[0]);
+			add(keyList[1]);
+			add(keyList[2]);
+			add(keyList[3]);
+			add(keyList[4]);
+			add(keyList[5]);
+		}
+	};
 
 	@Autowired
 	private ProductDaoImpl productDaoImpl;
+	@Autowired
+	private ConfigureDaoImpl configureDaoImpl;
 
 	private static final String prePath = "D:\\upload\\";
+	private static final String tempPath = "temp\\";
+	private static final String pdfPath = "pdf\\";
 
 	public ReturnMessage uploadProductCraftResource(String name, InputStream inputStream) {
 		ReturnMessage returnMessage = new ReturnMessage();
@@ -44,21 +64,92 @@ public class UploadServiceImpl implements UploadService {
 			return returnMessage;
 		}
 		Product product = new Product();
+		
 		product.setInvcode(parent);
 		product.setPath(prePath + parent);
 		if (!ZipUtil.unzip(inputStream, prePath + parent)) {
 			returnMessage.setReturn_msg(MESSAGE.UPLOAD_FAIL_UNZIP);
 			return returnMessage;
 		}
-		parseXlsFile(prePath + parent);
+		HashMap<String, List<String>> files = parseXlsFile(prePath + parent, product);
+		Configure configure = parsePdfFiles(files);
+		configure.setInvcode(parent);
+		product.setPdfpath(prePath + parent + "\\" + pdfPath);
 		productDaoImpl.updateProduct(product);
+		configureDaoImpl.updateConfigure(configure);
 		returnMessage.setReturn_code(MESSAGE.RETURN_SUCCESS);
 		returnMessage.setReturn_msg(MESSAGE.UPLOAD_SUCCESS);
 		return returnMessage;
 	};
 
-	private void parseXlsFile(String parent) {
+	private Configure parsePdfFiles(HashMap<String, List<String>> files) {
+		System.out.println("parsePdfFiles");
+		Configure configure= new Configure();
+		List<String> backlist = new ArrayList<>();		
+		if(files.containsKey(keyList[0])){
+			List<String> ls = files.get(keyList[0]);
+			int len = Math.min(8, ls.size());
+			for(int i =0 ;i<len;i++){
+				if(i==0){
+					configure.setW1(ls.get(i));
+				}else if(i==1){
+					configure.setW2(ls.get(i));
+				}else if(i==2){
+					configure.setW3(ls.get(i));
+				}else if(i==3){
+					configure.setW4(ls.get(i));
+				}else if(i==4){
+					configure.setW5(ls.get(i));
+				}else if(i==5){
+					configure.setW6(ls.get(i));
+				}else if(i==6){
+					configure.setW7(ls.get(i));
+				}else if(i==7){
+					configure.setW8(ls.get(i));
+				}
+			}
+		}
+		for(int i=1;i<keyList.length;i++){
+			if(files.containsKey(keyList[i])){
+				backlist.addAll(files.get(keyList[i]));
+			}
+		}
+		int len = Math.min(9, backlist.size());
+		for(int i =0 ;i< len;i++){
+			System.out.println(backlist.get(i));
+			if(i==0){
+				configure.setW9(backlist.get(i));
+			}else if(i==1){
+				configure.setW10(backlist.get(i));
+			}else if(i==2){
+				configure.setW11(backlist.get(i));
+			}else if(i==3){
+				configure.setW12(backlist.get(i));
+			}else if(i==4){
+				configure.setW13(backlist.get(i));
+			}else if(i==5){
+				configure.setW14(backlist.get(i));
+			}else if(i==6){
+				configure.setW15(backlist.get(i));
+			}else if(i==7){
+				configure.setW16(backlist.get(i));
+			}else if(i==8){
+				configure.setW17(backlist.get(i));
+			}
+		}
+		return configure;
+	}
+
+	private HashMap<String, List<String>> parseXlsFile(String parent, Product product) {
 		List<File> ls = FileUtil.getXlsFileList(parent);
+		File fileTemp = new File(parent + "\\" + tempPath);
+		fileTemp.mkdir();
+		File filePDF = new File(parent + "\\" + pdfPath);
+		filePDF.mkdir();
+		List<String> inList = new ArrayList<>();
+		List<String> outTempList = new ArrayList<>();
+		HashMap<String, String> tempMap = new HashMap<>();
+		HashMap<String, List<String>> val = new HashMap<>();
 		for (File file : ls) {
 			try {
 				InputStream inp = new FileInputStream(file);
@@ -66,94 +157,45 @@ public class UploadServiceImpl implements UploadService {
 				int len = wb.getNumberOfSheets();
 				wb.close();
 				inp.close();
+				System.out.println("save before:" + len);
 				for (int i = 0; i < len; i++) {
 					inp = new FileInputStream(file);
 					wb = new HSSFWorkbook(inp);
 					String name = wb.getSheetAt(i).getSheetName();
-					int j;
-					for(j=0;j<i;j++){
-						wb.removeSheetAt(0);
+					System.out.println("save before:" + name);
+					if (keyWords.contains(name)) {
+						String xlspath = parent + "\\" + tempPath + name + ".xls";
+						String pdfpath = parent + "\\" + pdfPath + name + ".pdf";
+						System.out.println("xlspath pdfpath:" + xlspath+" "+pdfpath);
+						int j;
+						for (j = 0; j < i; j++) {
+							wb.removeSheetAt(0);
+						}
+						for (; j < len - 1; j++) {
+							wb.removeSheetAt(1);
+						}
+						inList.add(xlspath);
+						tempMap.put(name, pdfpath);
+						outTempList.add(pdfpath);
+						FileOutputStream output = new FileOutputStream(xlspath);
+						wb.write(output);
+						output.close();
+						wb.close();
+						inp.close();
+						System.out.println("save after:" + pdfpath);
+					} else {
+						wb.close();
+						inp.close();
 					}
-					for(;j<len-1;j++){
-						wb.removeSheetAt(1);
-					}
-					FileOutputStream output = new FileOutputStream(parent+"\\"+name+".xls");
-					System.out.println("save:"+parent+"\\"+name);
-					wb.write(output);
-					wb.close();
-					output.close();
-					inp.close();
 				}
 			} catch (Exception e) {
-				System.out.println("Exception:"+e.getMessage());
+				e.printStackTrace();
 			}
+			FileUtil.xlsToPdf(inList, outTempList);
+			val = FileUtil.pdfSplitter(tempMap);
+			FileUtil.deleteAllFilesOfDir(fileTemp);
 		}
-	}
-
-	public void process(HSSFSheet sheet) throws IOException {
-		HSSFWorkbook myWorkBook = new HSSFWorkbook();
-		HSSFRow row = null;
-		HSSFCell cell = null;
-		HSSFSheet mySheet = null;
-		HSSFRow myRow = null;
-		HSSFCell myCell = null;
-		int fCell = 0;
-		int lCell = 0;
-		int fRow = 0;
-		int lRow = 0;
-
-		if (sheet != null) {
-			mySheet = myWorkBook.createSheet(sheet.getSheetName());
-			fRow = sheet.getFirstRowNum();
-			lRow = sheet.getLastRowNum();
-			for (int iRow = fRow; iRow <= lRow; iRow++) {
-				row = sheet.getRow(iRow);
-				myRow = mySheet.createRow(iRow);
-				if (row != null) {
-					fCell = row.getFirstCellNum();
-					lCell = row.getLastCellNum();
-					for (int iCell = fCell; iCell < lCell; iCell++) {
-						cell = row.getCell(iCell);
-						myCell = myRow.createCell(iCell);
-						if (cell != null) {
-							myCell.setCellType(cell.getCellType());
-							switch (cell.getCellType()) {
-							case HSSFCell.CELL_TYPE_BLANK:
-								myCell.setCellValue("");
-								break;
-
-							case HSSFCell.CELL_TYPE_BOOLEAN:
-								myCell.setCellValue(cell.getBooleanCellValue());
-								break;
-
-							case HSSFCell.CELL_TYPE_ERROR:
-								myCell.setCellErrorValue(cell.getErrorCellValue());
-								break;
-
-							case HSSFCell.CELL_TYPE_FORMULA:
-								myCell.setCellFormula(cell.getCellFormula());
-								break;
-
-							case HSSFCell.CELL_TYPE_NUMERIC:
-								myCell.setCellValue(cell.getNumericCellValue());
-								break;
-
-							case HSSFCell.CELL_TYPE_STRING:
-								myCell.setCellValue(cell.getStringCellValue());
-								break;
-							default:
-								myCell.setCellFormula(cell.getCellFormula());
-							}
-						}
-					}
-				}
-			}
-		}
-
-		BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("D:\\workbook.xls", true));
-		myWorkBook.write(bos);
-		myWorkBook.close();
-		bos.close();
+		return val;
 	}
 
 	private String parseProductCraftFileName(String name) {

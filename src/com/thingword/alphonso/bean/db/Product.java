@@ -4,6 +4,8 @@ public class Product {
 	private int ID;
 	private String invcode;
 	private String path;
+	private String pdfpath;
+	
 	public String getInvcode() {
 		return invcode;
 	}
@@ -22,4 +24,11 @@ public class Product {
 	public void setID(int iD) {
 		ID = iD;
 	}
+	public String getPdfpath() {
+		return pdfpath;
+	}
+	public void setPdfpath(String pdfpath) {
+		this.pdfpath = pdfpath;
+	}
+
 }

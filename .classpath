@@ -33,5 +33,7 @@
 	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/spring-core-3.2.3.RELEASE.jar"/>
 	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/spring-expression-3.2.3.RELEASE.jar"/>
 	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/spring-web-3.2.3.RELEASE.jar"/>
+	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/jacob.jar"/>
+	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/pdfbox-app-2.0.3.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
